@@ -4,6 +4,7 @@ use std::time::Duration;
 use std::{env, fs};
 
 use serenity::async_trait;
+use serenity::builder::EditMember;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
@@ -28,6 +29,7 @@ impl EventHandler for Handler {
             }
         }
         if msg.content == "!name" {
+            let guild = msg.guild_id.unwrap();
             // Get and increment number
             let number;
             {
@@ -36,31 +38,20 @@ impl EventHandler for Handler {
                 data.num += 1;
             }
 
-            let member = &msg
-                .guild_id
-                .unwrap()
-                .member(&ctx, msg.author)
-                .await
-                .unwrap();
-            let name = member.display_name().to_string();
+            let member = guild.member(&ctx, &msg.author).await.unwrap();
+            let name = &member.display_name();
 
             let number_text = format!("[{number}]");
 
             let full_nickname = format!("{name} {number_text}");
 
             // Set nickname
-            msg.guild_id
-                .unwrap()
-                .member(&ctx, 730885117656039466)
-                .await
-                .unwrap()
-                .edit(&ctx, |m| m.nickname(full_nickname))
-                .await
-                .unwrap();
+            let builder = EditMember::new().nickname(full_nickname);
+            let _ = guild.edit_member(&ctx.http, &msg.author.id, builder).await;
         }
     }
 
-    async fn guild_member_addition(&self, ctx: Context, guild_id: serenity::model::guild::Member) {
+    async fn guild_member_addition(&self, ctx: Context, member: serenity::model::guild::Member) {
         let number;
         {
             let mut data = NAME_DATA.lock().unwrap();
@@ -68,16 +59,17 @@ impl EventHandler for Handler {
             data.num += 1;
         }
 
-        let name = guild_id.display_name();
+        let name = member.display_name();
         let number_text = format!("[{number}]");
 
         let full_nickname = format!("{name} {number_text}");
 
         // Set nickname
-        guild_id
-            .edit(&ctx, |m| m.nickname(full_nickname))
-            .await
-            .unwrap();
+        let builder = EditMember::new().nickname(full_nickname);
+        let _ = member
+            .guild_id
+            .edit_member(&ctx.http, member, builder)
+            .await;
     }
 
     async fn ready(&self, _: Context, ready: Ready) {
